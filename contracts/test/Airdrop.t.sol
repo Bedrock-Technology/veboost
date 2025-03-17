@@ -32,8 +32,8 @@ contract AirdropTest is Test {
         user1 = address(0x1);
         user2 = address(0x2);
         
-        // Create merkle root
-        bytes32 leaf = keccak256(abi.encodePacked(user1, amount));
+        // Create merkle root using the same method as in the contract
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(user1, amount))));
         bytes32[] memory leaves = new bytes32[](1);
         leaves[0] = leaf;
         
@@ -70,7 +70,7 @@ contract AirdropTest is Test {
 
     function testFail_DoubleClaimTokens() public {
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = keccak256(abi.encodePacked("test proof"));
+        proof[0] = keccak256(bytes.concat(abi.encodePacked("test proof")));
 
         vm.startPrank(user1);
         airdrop.claimTokens(amount, proof);
@@ -80,7 +80,7 @@ contract AirdropTest is Test {
 
     function testFail_InvalidMerkleProof() public {
         bytes32[] memory proof = new bytes32[](1);
-        proof[0] = keccak256(abi.encodePacked("invalid proof"));
+        proof[0] = keccak256(bytes.concat(abi.encodePacked("invalid proof")));
 
         vm.startPrank(user1);
         airdrop.claimTokens(amount, proof);

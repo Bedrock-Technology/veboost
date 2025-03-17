@@ -18,8 +18,12 @@
 # vendor/
 
 # Go workspace file
-go.work
-go.work.sum
+/merkle/go.work
+/merkle/go.work.sum
+/merkle/VeMerkle
+/merkle/*.csv
+/merkle/*.idea
+/merkle/*.DS_Store
 
 # env file
 .env
