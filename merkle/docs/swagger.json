@@ -1,0 +1,135 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for verifying Merkle proofs of airdrop data",
+        "title": "Airdrop Merkle API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/merkle/import": {
+            "post": {
+                "description": "Import address and amount data from a CSV file to update the Merkle tree",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merkle"
+                ],
+                "summary": "Import Merkle tree data from CSV",
+                "parameters": [
+                    {
+                        "description": "Full path to the CSV file containing address and amount",
+                        "name": "csvFile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns success message",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Returns error message when CSV file is invalid",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/merkle/proof": {
+            "post": {
+                "description": "Get Merkle proof, amount and root hash for a given address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merkle"
+                ],
+                "summary": "Get Merkle proof for address",
+                "parameters": [
+                    {
+                        "description": "Ethereum address",
+                        "name": "address",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Returns address, amount, proof array and root hash",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Returns error message when address not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/merkle/root": {
+            "get": {
+                "description": "Retrieve the root hash of the Merkle tree",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merkle"
+                ],
+                "summary": "Get Merkle tree root",
+                "responses": {
+                    "200": {
+                        "description": "Returns the root hash of the Merkle tree",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Returns error message when Merkle tree is not initialized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

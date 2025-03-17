@@ -1,0 +1,90 @@
+basePath: /api/v1
+host: localhost:8080
+info:
+  contact: {}
+  description: API for verifying Merkle proofs of airdrop data
+  title: Airdrop Merkle API
+  version: "1.0"
+paths:
+  /merkle/import:
+    post:
+      consumes:
+      - application/json
+      description: Import address and amount data from a CSV file to update the Merkle
+        tree
+      parameters:
+      - description: Full path to the CSV file containing address and amount
+        in: body
+        name: csvFile
+        required: true
+        schema:
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns success message
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Returns error message when CSV file is invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Import Merkle tree data from CSV
+      tags:
+      - merkle
+  /merkle/proof:
+    post:
+      consumes:
+      - application/json
+      description: Get Merkle proof, amount and root hash for a given address
+      parameters:
+      - description: Ethereum address
+        in: body
+        name: address
+        required: true
+        schema:
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns address, amount, proof array and root hash
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Returns error message when address not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Merkle proof for address
+      tags:
+      - merkle
+  /merkle/root:
+    get:
+      description: Retrieve the root hash of the Merkle tree
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns the root hash of the Merkle tree
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Returns error message when Merkle tree is not initialized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Merkle tree root
+      tags:
+      - merkle
+swagger: "2.0"

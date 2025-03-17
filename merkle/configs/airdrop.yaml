@@ -1,0 +1,32 @@
+# Application Configuration
+
+# Logger Configuration
+logger:
+  # Log level: debug, info, warn, error, fatal, panic
+  level: info
+  # Log format: text, json
+  format: json
+  # Output to console
+  stdout: false
+  # Log file configuration
+  file:
+    # Log file path
+    path: "logs/app.log"
+    # Maximum size of single log file (MB)
+    max_size: 100
+    # Maximum number of old log files to retain
+    max_backups: 5
+    # Maximum days to retain old log files
+    max_age: 30
+    # Compress old log files
+    compress: false
+
+# Swagger Configuration
+doc_auth:
+  ve_merkle: "bedrock"
+
+# DNS Configuration
+dns:
+  # DNS server address
+  endpoint: "http://localhost:8090"
+  
