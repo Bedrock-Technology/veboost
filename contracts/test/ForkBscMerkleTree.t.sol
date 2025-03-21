@@ -3,26 +3,26 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 import {Airdrop} from "../src/airdrop.sol";
-import "./mocks/MockVotingEscrow.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IVotingEscrowCore} from "../src/interface/IVotingEscrowIncreasing.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-contract MockToken is ERC20 {
-    constructor() ERC20("Mock Token", "MTK") {
-        _mint(msg.sender, 1000000 * 10**18);
-    }
-}
-
-contract MerkleTreeTest is Test {
+///forge test --match-contract ForkBscMerkleTreeTest --match-test testClaimAirdrop --fork-url wss://bsc-rpc.publicnode.com -vvvv
+contract ForkBscMerkleTreeTest is Test {
     // Contract instances
     Airdrop private implementation;
     Airdrop private airdrop;
-    MockToken private brToken;
-    MockVotingEscrow private votingEscrow;
+    IERC20 private brToken;
+    IVotingEscrowCore private votingEscrow;
     ProxyAdmin private proxyAdmin;
     address private admin;
+
+    // BSC mainnet contract addresses
+    address constant PROXY_ADMIN = 0xb3f925B430C60bA467F7729975D5151c8DE26698;
+    address constant VOTING_ESCROW = 0x25ab4059145E7f1A5404390f0B82d94079b3e83f;
+    address constant BR_TOKEN = 0xFf7d6A96ae471BbCD7713aF9CB1fEeB16cf56B41;
 
     // Constants for airdrop configuration
     uint32 public constant ACTIVATION_DELAY = 1 days;
@@ -46,13 +46,11 @@ contract MerkleTreeTest is Test {
     ];
 
     function setUp() public {
-        // Initialize admin and deploy mock contracts
+        // Initialize contract instances from mainnet
         admin = address(this);
-        brToken = new MockToken();
-        votingEscrow = new MockVotingEscrow(address(brToken));
-        
-        // Deploy proxy admin contract
-        proxyAdmin = new ProxyAdmin();
+        brToken = IERC20(BR_TOKEN);
+        votingEscrow = IVotingEscrowCore(VOTING_ESCROW);
+        proxyAdmin = ProxyAdmin(PROXY_ADMIN);
         
         // Deploy implementation contract
         implementation = new Airdrop();
@@ -61,20 +59,23 @@ contract MerkleTreeTest is Test {
         bytes memory initData = abi.encodeWithSelector(
             Airdrop.initialize.selector,
             ACTIVATION_DELAY,
-            address(votingEscrow),
-            address(brToken),
+            VOTING_ESCROW,
+            BR_TOKEN,
             admin
         );
         
         // Deploy proxy contract
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(implementation),
-            address(proxyAdmin),
+            PROXY_ADMIN,
             initData
         );
         
         // Cast proxy contract to Airdrop interface
         airdrop = Airdrop(address(proxy));
+        
+        // Deal BR tokens to this contract for testing
+        deal(BR_TOKEN, address(this), 1000000 * 10**18);
         
         // Transfer tokens to airdrop contract for distribution
         brToken.transfer(address(airdrop), 1000000 * 10**18);
@@ -134,5 +135,5 @@ contract MerkleTreeTest is Test {
         vm.expectRevert("USR008");
         airdrop.claimAirdrop(amount, proof);
         vm.stopPrank();
-    }
+    } 
 }

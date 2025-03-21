@@ -64,3 +64,21 @@ forge test
 forge script script/Airdrop.s.sol:AirdropScript --rpc-url <your_rpc_url> --private-key <your_private_key>
 ```
 
+### Error Codes from contracts
+
+| Error Code | Description |
+|------------|-------------|
+| SYS001 | INVALID_ADDRESS |
+| SYS002 | INVALID_INPUT_PARAMETER |
+| SYS003 | APPROVE_FAILED |
+| USR001 | CURRENT_EPOCH_IS_STILL_VALID |
+| USR002 | NO_ACTIVE_EPOCH |
+| USR003 | INVALID_ROOT |
+| USR004 | NEW_DURATION_WOULD_EXPIRE_IMMEDIATELY |
+| USR005 | ALREADY_CLAIMED |
+| USR006 | DISTRIBUTION_DISABLED |
+| USR007 | DISTRIBUTION_NOT_ACTIVATED |
+| USR008 | DISTRIBUTION_EXPIRED |
+| USR009 | INVALID_PROOF |
+
+ 

@@ -4,8 +4,9 @@ pragma solidity ^0.8.17;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Airdrop} from "../src/airdrop.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IVotingEscrowCore} from "../src/interface/IVotingEscrowIncreasing.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 /*
 
 # prepare .env file
@@ -14,6 +15,9 @@ DEPLOYER_ADDRESS=<deployer-address>
 MERKLE_ROOT=<merkle-root-hex>
 VOTING_ESCROW_ADDRESS=<voting-escrow-contract-address>
 BR_TOKEN_ADDRESS=<br-token-contract-address>
+PROXY_ADMIN=<proxy-admin-address>
+ADMIN=<admin-address>
+ACTIVATION_DELAY=<activation-delay-seconds>
 EVM_RPC=<evm-rpc>
 ETHERSCAN_API_KEY=<etherscan-api-key>
 ETHERSCAN_API_URL=<etherscan-api-url>
@@ -42,27 +46,46 @@ forge script -vvvv \
 
 contract DeployAirdrop is Script {
     function run() external {
+        // Read all required parameters from environment variables
         address deployer = vm.envAddress("DEPLOYER_ADDRESS");
-        
-
-        bytes32 merkleRoot = vm.envBytes32("MERKLE_ROOT");
+        address proxyAdmin = vm.envAddress("PROXY_ADMIN");
         address votingEscrow = vm.envAddress("VOTING_ESCROW_ADDRESS");
         address brToken = vm.envAddress("BR_TOKEN_ADDRESS");
+        address admin = vm.envAddress("ADMIN");
+        uint32 activationDelay = uint32(vm.envUint("ACTIVATION_DELAY"));
 
         vm.startBroadcast(deployer);
 
-        console.log("[Signer] deployer:", deployer);
-        console.log("[Param] merkleRoot:", uint256(merkleRoot));
-        console.log("[Contract] votingEscrow:", votingEscrow);
-        console.log("[Contract] brToken:", brToken);
+        // Print deployment parameters
+        console.log("=== Deployment Parameters ===");
+        console.log("Deployer:", deployer);
+        console.log("ProxyAdmin:", proxyAdmin);
+        console.log("VotingEscrow:", votingEscrow);
+        console.log("BRToken:", brToken);
+        console.log("Admin:", admin);
+        console.log("ActivationDelay:", activationDelay);
 
-        Airdrop airdrop = new Airdrop(
-            merkleRoot,
+        // Deploy implementation contract
+        Airdrop implementation = new Airdrop();
+        console.log("\n=== Deployment Results ===");
+        console.log("Implementation deployed at:", address(implementation));
+
+        // Prepare initialization data
+        bytes memory initData = abi.encodeWithSelector(
+            Airdrop.initialize.selector,
+            activationDelay,
             votingEscrow,
-            brToken
+            brToken,
+            admin
         );
-        console.log("[Contract] Airdrop deployed at:", address(airdrop));
 
+        // Deploy proxy contract using existing ProxyAdmin
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(implementation),
+            proxyAdmin,
+            initData
+        );
+        console.log("Proxy deployed at:", address(proxy));
         vm.stopBroadcast();
     }
 }
