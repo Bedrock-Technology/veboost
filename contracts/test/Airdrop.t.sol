@@ -73,11 +73,11 @@ contract AirdropTest is Test {
         airdrop.submitMerkleRoot(merkleRoot, validDuration);
         Airdrop.DistributionRoot memory distribution = airdrop.getDistributionRoot(1);
         assertEq(distribution.root, merkleRoot);
-        assertEq(distribution.validDuration, validDuration);
+        assertEq(distribution.duration, validDuration);
         assertEq(distribution.disabled, false);
     }
 
-    function testClaimAirdrop() public {
+    function testClaim() public {
         // Submit merkle root and wait for activation
         airdrop.submitMerkleRoot(merkleRoot, validDuration);
         vm.warp(block.timestamp + activationDelay);
@@ -93,7 +93,7 @@ contract AirdropTest is Test {
         bytes32[] memory proof = new bytes32[](0);
 
         // Execute claim
-        airdrop.claimAirdrop(1000, proof);
+        airdrop.claim(1000, proof);
         
         // Verify claim success
         assertTrue(airdrop.hasUserClaimed(1, address(this)));
@@ -110,12 +110,12 @@ contract AirdropTest is Test {
         // Test pause functionality
         airdrop.pause();
         vm.expectRevert("Pausable: paused");
-        airdrop.claimAirdrop(1000, proof);
+        airdrop.claim(1000, proof);
 
         // Test unpause and claim
         airdrop.unpause();
         vm.warp(block.timestamp + activationDelay);
-        airdrop.claimAirdrop(1000, proof);
+        airdrop.claim(1000, proof);
         assertTrue(airdrop.hasUserClaimed(1, address(this)));
     }
 
@@ -127,17 +127,17 @@ contract AirdropTest is Test {
         assertEq(distribution.root, newRoot);
     }
 
-    function testUpdateValidDuration() public {
+    function testUpdateDuration() public {
         airdrop.submitMerkleRoot(merkleRoot, validDuration);
         uint32 newDuration = 60 days;
-        airdrop.updateValidDuration(newDuration);
+        airdrop.updateDuration(newDuration);
         Airdrop.DistributionRoot memory distribution = airdrop.getDistributionRoot(1);
-        assertEq(distribution.validDuration, newDuration);
+        assertEq(distribution.duration, newDuration);
     }
 
     function testSetAirdropDisabled() public {
         airdrop.submitMerkleRoot(merkleRoot, validDuration);
-        airdrop.setAirdropDisabled(true);
+        airdrop.setAirdrop(true);
         Airdrop.DistributionRoot memory distribution = airdrop.getDistributionRoot(1);
         assertEq(distribution.disabled, true);
     }

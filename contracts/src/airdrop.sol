@@ -11,16 +11,17 @@ import "./interface/IVotingEscrowIncreasing.sol";
 
 contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
+
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant REWARDS_UPDATER_ROLE = keccak256("REWARDS_UPDATER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     struct DistributionRoot {
         /// @notice The root of Merkle tree for airdrop distribution.
         bytes32 root;
         /// @notice The timestamp when this distribution becomes active.
         uint32 activatedAt;
-        /// @notice The duration in seconds that this distribution remains valid.
-        uint32 validDuration;
+        /// @notice The duration in seconds that this distribution remains active.
+        uint32 duration;
         /// @notice The flag indicating if this distribution is disabled.
         bool disabled;
     }
@@ -33,10 +34,10 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
     uint32 public activationDelay;
     /// @notice Current epoch number of the airdrop distribution.
     uint256 public currentEpoch;
-    /// @notice Interface of the voting escrow contract.
-    IVotingEscrowCore public votingEscrow;
-    /// @notice Interface of the BR token contract.
-    IERC20 public brToken;
+    /// @notice Address of the voting escrow contract.
+    address public votingEscrow;
+    /// @notice Address of the BR token contract.
+    address public brToken;
 
     /**
      * ======================================================================================
@@ -78,10 +79,10 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
 
         _setupRole(DEFAULT_ADMIN_ROLE, _admin);
         _setupRole(PAUSER_ROLE, _admin);
-        _setupRole(REWARDS_UPDATER_ROLE, _admin);
+        _setupRole(OPERATOR_ROLE, _admin);
 
-        votingEscrow = IVotingEscrowCore(_votingEscrow);
-        brToken = IERC20(_brToken);
+        votingEscrow = _votingEscrow;
+        brToken = _brToken;
         _setActivationDelay(_activationDelay);
         currentEpoch = 0;
     }
@@ -104,41 +105,41 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
 
     /**
      * @notice Sets the delay in timestamp before a posted root can be claimed against.
-     * @dev Only callable by the contract owner.
+     * @dev Only callable by accounts with OPERATOR_ROLE.
      * @param _activationDelay The new value for activationDelay.
      */
-    function setActivationDelay(uint32 _activationDelay) external onlyRole(REWARDS_UPDATER_ROLE) {
+    function setActivationDelay(uint32 _activationDelay) external onlyRole(OPERATOR_ROLE) {
         _setActivationDelay(_activationDelay);
     }
 
     /**
      * @notice Submits a new Merkle root and starts a new airdrop epoch.
-     * @dev Only callable by accounts with REWARDS_UPDATER_ROLE.
+     * @dev Only callable by accounts with OPERATOR_ROLE.
      * @param _newRoot The Merkle root of the new distribution.
-     * @param _validDuration The duration in seconds for which this distribution is valid.
+     * @param _duration The duration in seconds for which this distribution is valid.
      */
-    function submitMerkleRoot(bytes32 _newRoot, uint32 _validDuration) external onlyRole(REWARDS_UPDATER_ROLE) {
-        require(_validDuration > 0, "SYS002");
+    function submitMerkleRoot(bytes32 _newRoot, uint32 _duration) external onlyRole(OPERATOR_ROLE) {
+        require(_duration > 0, "SYS002");
         require(_newRoot != bytes32(0), "SYS002");
-        require(!_isCurrentEpochValid(), "USR001");
+        require(!_isActive(), "USR001");
         currentEpoch++;
 
         merkleRoots[currentEpoch] = DistributionRoot({
             root: _newRoot,
             activatedAt: uint32(block.timestamp) + activationDelay,
-            validDuration: _validDuration,
+            duration: _duration,
             disabled: false
         });
 
-        emit MerkleRootSubmit(currentEpoch, _newRoot, _validDuration, uint32(block.timestamp));
+        emit MerkleRootSubmit(currentEpoch, _newRoot, _duration, uint32(block.timestamp));
     }
 
     /**
      * @notice Updates the Merkle root for the current epoch.
-     * @dev Only callable by accounts with REWARDS_UPDATER_ROLE.
+     * @dev Only callable by accounts with OPERATOR_ROLE.
      * @param _newRoot The new Merkle root to replace the current one.
      */
-    function updateMerkleRoot(bytes32 _newRoot) external onlyRole(REWARDS_UPDATER_ROLE) {
+    function updateMerkleRoot(bytes32 _newRoot) external onlyRole(OPERATOR_ROLE) {
         require(currentEpoch > 0, "USR002");
         require(_newRoot != bytes32(0), "USR003");
         emit MerkleRootUpdate(currentEpoch, merkleRoots[currentEpoch].root, _newRoot);
@@ -147,24 +148,26 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
 
     /**
      * @notice Updates the valid duration for the current epoch.
-     * @dev Only callable by accounts with REWARDS_UPDATER_ROLE.
-     * @param _validDuration The new duration in seconds.
+     * @dev Only callable by accounts with OPERATOR_ROLE.
+     * @param _duration The new duration in seconds.
      */
-    function updateValidDuration(uint32 _validDuration) external onlyRole(REWARDS_UPDATER_ROLE) {
+    function updateDuration(uint32 _duration) external onlyRole(OPERATOR_ROLE) {
         require(currentEpoch > 0, "USR002");
-        require(block.timestamp <= merkleRoots[currentEpoch].activatedAt + _validDuration, "USR004");
-        emit ValidDurationUpdate(currentEpoch, merkleRoots[currentEpoch].validDuration, _validDuration);
-        merkleRoots[currentEpoch].validDuration = _validDuration;
+        require(block.timestamp <= merkleRoots[currentEpoch].activatedAt + _duration, "USR004");
+        emit ValidDurationUpdate(currentEpoch, merkleRoots[currentEpoch].duration, _duration);
+        merkleRoots[currentEpoch].duration = _duration;
     }
 
     /**
      * @notice Sets the distribution status for the current epoch.
-     * @dev Only callable by accounts with REWARDS_UPDATER_ROLE.
+     * @dev Only callable by accounts with OPERATOR_ROLE.
      * @param _disabled The status to set (true = disabled, false = enabled).
      */
-    function setAirdropDisabled(bool _disabled) external onlyRole(REWARDS_UPDATER_ROLE) {
+    function setAirdrop(bool _disabled) external onlyRole(OPERATOR_ROLE) {
         require(currentEpoch > 0, "USR002");
-        _setAirdropDisabled(_disabled);
+        DistributionRoot storage distribution = merkleRoots[currentEpoch];
+        emit DistributionDisabledSet(currentEpoch, distribution.disabled, _disabled);
+        distribution.disabled = _disabled;
     }
 
     /**
@@ -174,19 +177,14 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      *
      * ======================================================================================
      */
+    /**
+     * @notice Updates the activation delay for airdrop claims.
+     * @dev Internal function to update the delay before claims can be made.
+     * @param _activationDelay The new activation delay value in seconds.
+     */
     function _setActivationDelay(uint32 _activationDelay) internal {
         emit ActivationDelaySet(activationDelay, _activationDelay);
         activationDelay = _activationDelay;
-    }
-
-    /**
-     * @dev Internal function to set the distribution status.
-     * @param _disabled The status to set (true = disabled, false = enabled).
-     */
-    function _setAirdropDisabled(bool _disabled) internal {
-        DistributionRoot storage distribution = merkleRoots[currentEpoch];
-        emit DistributionDisabledSet(currentEpoch, distribution.disabled, _disabled);
-        distribution.disabled = _disabled;
     }
 
     /**
@@ -194,14 +192,14 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @dev Returns false if: no active epoch, distribution disabled, or expired.
      * @return True if the current epoch's airdrop is valid and active.
      */
-    function _isCurrentEpochValid() internal view returns (bool) {
+    function _isActive() internal view returns (bool) {
         if (currentEpoch == 0) return false;
 
         DistributionRoot memory distribution = merkleRoots[currentEpoch];
         if (distribution.disabled) return false;
 
         uint256 currentTime = block.timestamp;
-        if (currentTime > distribution.activatedAt + distribution.validDuration) return false;
+        if (currentTime > distribution.activatedAt + distribution.duration) return false;
 
         return true;
     }
@@ -220,7 +218,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @param _amount The amount of tokens to claim.
      * @param _proof The Merkle proof verifying the claim eligibility.
      */
-    function claimAirdrop(uint256 _amount, bytes32[] calldata _proof) external whenNotPaused nonReentrant {
+    function claim(uint256 _amount, bytes32[] calldata _proof) external whenNotPaused nonReentrant {
         require(currentEpoch > 0, "USR002");
         require(!hasClaimed[currentEpoch][msg.sender], "USR005");
 
@@ -229,7 +227,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
 
         // Check if the distribution is within valid period.
         require(block.timestamp >= distribution.activatedAt, "USR007");
-        require(block.timestamp <= distribution.activatedAt + distribution.validDuration, "USR008");
+        require(block.timestamp <= distribution.activatedAt + distribution.duration, "USR008");
 
         // Verify Merkle proof.
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender, _amount))));
@@ -239,8 +237,8 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
         hasClaimed[currentEpoch][msg.sender] = true;
 
         // Transfer tokens and lock in VotingEscrow.
-        brToken.safeApprove(address(votingEscrow), _amount);
-        uint256 veNFTId = votingEscrow.createLockFor(_amount, msg.sender);
+        IERC20(brToken).safeApprove(votingEscrow, _amount);
+        uint256 veNFTId = IVotingEscrowCore(votingEscrow).createLockFor(_amount, msg.sender);
 
         emit AirdropClaimed(currentEpoch, msg.sender, _amount, veNFTId);
     }
@@ -271,8 +269,8 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @dev Returns false if: no active epoch, distribution disabled, not activated yet, or expired.
      * @return True if the current epoch's airdrop is valid and active.
      */
-    function isCurrentEpochValid() external view returns (bool) {
-        return _isCurrentEpochValid();
+    function isCurrentEpochActive() external view returns (bool) {
+        return _isActive();
     }
 
     /**
