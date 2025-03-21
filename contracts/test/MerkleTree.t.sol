@@ -93,7 +93,7 @@ contract MerkleTreeTest is Test {
         assertFalse(airdrop.hasUserClaimed(1, claimant), "User should not have claimed");
         
         // Execute claim operation
-        airdrop.claimAirdrop(amount, proof);
+        airdrop.claim(amount, proof);
         
         // Verify final claim status
         assertTrue(airdrop.hasUserClaimed(1, claimant), "Claim should be successful");
@@ -105,11 +105,11 @@ contract MerkleTreeTest is Test {
         vm.startPrank(claimant);
         
         // First claim should succeed
-        airdrop.claimAirdrop(amount, proof);
+        airdrop.claim(amount, proof);
         
         // Second claim should fail with duplicate claim error
         vm.expectRevert("USR005");
-        airdrop.claimAirdrop(amount, proof);
+        airdrop.claim(amount, proof);
         
         vm.stopPrank();
     }
@@ -121,7 +121,7 @@ contract MerkleTreeTest is Test {
         vm.startPrank(claimant);
         // Should fail with not activated error
         vm.expectRevert("USR007");
-        airdrop.claimAirdrop(amount, proof);
+        airdrop.claim(amount, proof);
         vm.stopPrank();
     }
 
@@ -132,7 +132,7 @@ contract MerkleTreeTest is Test {
         vm.startPrank(claimant);
         // Should fail with expired error
         vm.expectRevert("USR008");
-        airdrop.claimAirdrop(amount, proof);
+        airdrop.claim(amount, proof);
         vm.stopPrank();
     }
 }
