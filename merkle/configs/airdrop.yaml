@@ -11,7 +11,7 @@ logger:
   # Log file configuration
   file:
     # Log file path
-    path: "logs/app.log"
+    path: "/tmp/logs/app.log"
     # Maximum size of single log file (MB)
     max_size: 100
     # Maximum number of old log files to retain

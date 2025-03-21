@@ -85,8 +85,8 @@ var normalizeCSVCmd = &cobra.Command{
 				return fmt.Errorf("invalid CSV record format at line %d", i+2)
 			}
 
-			address := strings.ToLower(strings.TrimSpace(record[0]))
-			if !isValidAddress(address) {
+			address := strings.TrimSpace(record[0])
+			if !isValidEthAddress(address) {
 				return fmt.Errorf("invalid ethereum address at line %d: %s", i+2, address)
 			}
 			amount, ok := new(big.Int).SetString(strings.TrimSpace(record[1]), 10)
