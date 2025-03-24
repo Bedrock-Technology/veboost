@@ -32,34 +32,27 @@ contract AirdropTest is Test {
         brToken = new MockToken();
         votingEscrow = new MockVotingEscrow(address(brToken));
         merkleRoot = keccak256(bytes.concat(keccak256(abi.encode(msg.sender, 1000))));
-        
+
         // Deploy proxy admin contract
         proxyAdmin = new ProxyAdmin();
-        
+
         // Deploy implementation contract
         implementation = new Airdrop();
-        
+
         // Prepare initialization data
         bytes memory initData = abi.encodeWithSelector(
-            Airdrop.initialize.selector,
-            activationDelay,
-            address(votingEscrow),
-            address(brToken),
-            admin
+            Airdrop.initialize.selector, activationDelay, address(votingEscrow), address(brToken), admin
         );
-        
+
         // Deploy proxy contract
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            address(proxyAdmin),
-            initData
-        );
-        
+        TransparentUpgradeableProxy proxy =
+            new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
+
         // Cast proxy contract to Airdrop interface
         airdrop = Airdrop(address(proxy));
-        
+
         // Transfer tokens for testing
-        brToken.transfer(address(airdrop), 1000000 * 10**18);
+        brToken.transfer(address(airdrop), 1000000 * 10 ** 18);
     }
 
     function testInitialize() public view {
@@ -84,26 +77,29 @@ contract AirdropTest is Test {
 
         // Calculate leaf using the same method as in contract
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(address(this), 1000))));
-        
+
         // Use this leaf as merkleRoot (simplified Merkle tree)
         merkleRoot = leaf;
         airdrop.updateMerkleRoot(merkleRoot);
-        
+
         // Create empty proof (since we use leaf as root directly)
         bytes32[] memory proof = new bytes32[](0);
 
         // Execute claim
         airdrop.claim(1000, proof);
-        
-        // Verify claim success
-        assertTrue(airdrop.hasUserClaimed(1, address(this)));
+
+        // Verify claim success using updated function
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory claims = airdrop.hasUsersClaimed(1, users);
+        assertTrue(claims[0]);
     }
 
     function testPauseAndUnpause() public {
         // Submit merkle root and wait for activation
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(address(this), 1000))));
         merkleRoot = leaf;
-        
+
         airdrop.submitMerkleRoot(merkleRoot, validDuration);
         bytes32[] memory proof = new bytes32[](0);
 
@@ -116,7 +112,10 @@ contract AirdropTest is Test {
         airdrop.unpause();
         vm.warp(block.timestamp + activationDelay);
         airdrop.claim(1000, proof);
-        assertTrue(airdrop.hasUserClaimed(1, address(this)));
+        address[] memory users = new address[](1);
+        users[0] = address(this);
+        bool[] memory claims = airdrop.hasUsersClaimed(1, users);
+        assertTrue(claims[0]);
     }
 
     function testUpdateMerkleRoot() public {
