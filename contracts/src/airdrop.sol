@@ -254,14 +254,19 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
     }
 
     /**
-     * @notice Checks if a user has claimed their airdrop for a specific epoch.
-     * @dev Returns the claim status from hasClaimed mapping.
+     * @notice Checks if a list of users have claimed their airdrop for a specific epoch.
+     * @dev Returns the claim status for each user in the provided address array.
      * @param _epoch The epoch number to query.
-     * @param _user The address of the user to check.
-     * @return True if the user has claimed, false otherwise.
+     * @param _users An array of user addresses to check.
+     * @return An array of boolean values indicating claim status for each user.
      */
-    function hasUserClaimed(uint256 _epoch, address _user) external view returns (bool) {
-        return hasClaimed[_epoch][_user];
+    function hasUsersClaimed(uint256 _epoch, address[] calldata _users) external view returns (bool[] memory) {
+        require(_users.length > 0, "SYS002");
+        bool[] memory claims = new bool[](_users.length);
+        for (uint256 i = 0; i < _users.length; i++) {
+            claims[i] = hasClaimed[_epoch][_users[i]];
+        }
+        return claims;
     }
 
     /**

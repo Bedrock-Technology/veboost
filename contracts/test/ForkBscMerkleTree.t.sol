@@ -27,7 +27,7 @@ contract ForkBscMerkleTreeTest is Test {
     // Constants for airdrop configuration
     uint32 public constant ACTIVATION_DELAY = 1 days;
     uint32 public constant VALID_DURATION = 30 days;
-    
+
     // Test data for merkle proof verification
     address public constant claimant = address(0x0C99B08F2233b04066fe13A0A1Bf1474416fD77F);
     uint256 public constant amount = 1802977279010487416443;
@@ -51,74 +51,70 @@ contract ForkBscMerkleTreeTest is Test {
         brToken = IERC20(BR_TOKEN);
         votingEscrow = IVotingEscrowCore(VOTING_ESCROW);
         proxyAdmin = ProxyAdmin(PROXY_ADMIN);
-        
+
         // Deploy implementation contract
         implementation = new Airdrop();
-        
+
         // Prepare initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            Airdrop.initialize.selector,
-            ACTIVATION_DELAY,
-            VOTING_ESCROW,
-            BR_TOKEN,
-            admin
-        );
-        
+        bytes memory initData =
+            abi.encodeWithSelector(Airdrop.initialize.selector, ACTIVATION_DELAY, VOTING_ESCROW, BR_TOKEN, admin);
+
         // Deploy proxy contract
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            PROXY_ADMIN,
-            initData
-        );
-        
+        TransparentUpgradeableProxy proxy =
+            new TransparentUpgradeableProxy(address(implementation), PROXY_ADMIN, initData);
+
         // Cast proxy contract to Airdrop interface
         airdrop = Airdrop(address(proxy));
-        
+
         // Deal BR tokens to this contract for testing
-        deal(BR_TOKEN, address(this), 1000000 * 10**18);
-        
+        deal(BR_TOKEN, address(this), 1000000 * 10 ** 18);
+
         // Transfer tokens to airdrop contract for distribution
-        brToken.transfer(address(airdrop), 1000000 * 10**18);
-        
+        brToken.transfer(address(airdrop), 1000000 * 10 ** 18);
+
         // Submit merkle root for the first epoch
         airdrop.submitMerkleRoot(merkleRoot, VALID_DURATION);
-        
+
         // Fast forward time to activation period
         vm.warp(block.timestamp + ACTIVATION_DELAY);
     }
 
     function testClaimAirdrop() public {
         vm.startPrank(claimant);
-        
+
+        address[] memory users = new address[](1);
+        users[0] = claimant;
+        bool[] memory claims = airdrop.hasUsersClaimed(1, users);
         // Verify initial claim status
-        assertFalse(airdrop.hasUserClaimed(1, claimant), "User should not have claimed");
-        
+        assertFalse(claims[0], "User should not have claimed");
+
         // Execute claim operation
         airdrop.claim(amount, proof);
-        
+
+        claims = airdrop.hasUsersClaimed(1, users);
         // Verify final claim status
-        assertTrue(airdrop.hasUserClaimed(1, claimant), "Claim should be successful");
-        
+        assertTrue(claims[0], "Claim should be successful");
+
         vm.stopPrank();
     }
 
     function testClaimTwice() public {
         vm.startPrank(claimant);
-        
+
         // First claim should succeed
         airdrop.claim(amount, proof);
-        
+
         // Second claim should fail with duplicate claim error
         vm.expectRevert("USR005");
         airdrop.claim(amount, proof);
-        
+
         vm.stopPrank();
     }
 
     function testClaimBeforeActivation() public {
         // Reset time to before activation period
         vm.warp(block.timestamp - ACTIVATION_DELAY);
-        
+
         vm.startPrank(claimant);
         // Should fail with not activated error
         vm.expectRevert("USR007");
@@ -129,11 +125,11 @@ contract ForkBscMerkleTreeTest is Test {
     function testClaimAfterExpiration() public {
         // Fast forward time to after expiration
         vm.warp(block.timestamp + VALID_DURATION + 1);
-        
+
         vm.startPrank(claimant);
         // Should fail with expired error
         vm.expectRevert("USR008");
         airdrop.claim(amount, proof);
         vm.stopPrank();
-    } 
+    }
 }
