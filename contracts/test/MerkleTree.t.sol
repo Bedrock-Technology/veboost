@@ -73,7 +73,7 @@ contract MerkleTreeTest is Test {
         brToken.transfer(address(airdrop), 1000000 * 10 ** 18);
 
         // Submit merkle root for the first epoch
-        airdrop.submitMerkleRoot(merkleRoot, VALID_DURATION);
+        airdrop.submitRoot(merkleRoot, VALID_DURATION);
 
         // Fast forward time to activation period
         vm.warp(block.timestamp + ACTIVATION_DELAY);
@@ -84,14 +84,14 @@ contract MerkleTreeTest is Test {
 
         address[] memory users = new address[](1);
         users[0] = claimant;
-        bool[] memory claims = airdrop.hasUsersClaimed(1, users);
+        bool[] memory claims = airdrop.hasClaimed(1, users);
         // Verify initial claim status
         assertFalse(claims[0], "User should not have claimed");
 
         // Execute claim operation
         airdrop.claim(amount, proof);
 
-        claims = airdrop.hasUsersClaimed(1, users);
+        claims = airdrop.hasClaimed(1, users);
         // Verify final claim status
         assertTrue(claims[0], "Claim should be successful");
 

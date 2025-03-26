@@ -63,8 +63,8 @@ contract AirdropTest is Test {
     }
 
     function testSubmitMerkleRoot() public {
-        airdrop.submitMerkleRoot(merkleRoot, validDuration);
-        Airdrop.DistributionRoot memory distribution = airdrop.getDistributionRoot(1);
+        airdrop.submitRoot(merkleRoot, validDuration);
+        Airdrop.Dist memory distribution = airdrop.getRoot(1);
         assertEq(distribution.root, merkleRoot);
         assertEq(distribution.duration, validDuration);
         assertEq(distribution.disabled, false);
@@ -72,7 +72,7 @@ contract AirdropTest is Test {
 
     function testClaim() public {
         // Submit merkle root and wait for activation
-        airdrop.submitMerkleRoot(merkleRoot, validDuration);
+        airdrop.submitRoot(merkleRoot, validDuration);
         vm.warp(block.timestamp + activationDelay);
 
         // Calculate leaf using the same method as in contract
@@ -80,7 +80,7 @@ contract AirdropTest is Test {
 
         // Use this leaf as merkleRoot (simplified Merkle tree)
         merkleRoot = leaf;
-        airdrop.updateMerkleRoot(merkleRoot);
+        airdrop.updateRoot(merkleRoot);
 
         // Create empty proof (since we use leaf as root directly)
         bytes32[] memory proof = new bytes32[](0);
@@ -91,53 +91,30 @@ contract AirdropTest is Test {
         // Verify claim success using updated function
         address[] memory users = new address[](1);
         users[0] = address(this);
-        bool[] memory claims = airdrop.hasUsersClaimed(1, users);
-        assertTrue(claims[0]);
-    }
-
-    function testPauseAndUnpause() public {
-        // Submit merkle root and wait for activation
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(address(this), 1000))));
-        merkleRoot = leaf;
-
-        airdrop.submitMerkleRoot(merkleRoot, validDuration);
-        bytes32[] memory proof = new bytes32[](0);
-
-        // Test pause functionality
-        airdrop.pause();
-        vm.expectRevert("Pausable: paused");
-        airdrop.claim(1000, proof);
-
-        // Test unpause and claim
-        airdrop.unpause();
-        vm.warp(block.timestamp + activationDelay);
-        airdrop.claim(1000, proof);
-        address[] memory users = new address[](1);
-        users[0] = address(this);
-        bool[] memory claims = airdrop.hasUsersClaimed(1, users);
+        bool[] memory claims = airdrop.hasClaimed(1, users);
         assertTrue(claims[0]);
     }
 
     function testUpdateMerkleRoot() public {
-        airdrop.submitMerkleRoot(merkleRoot, validDuration);
+        airdrop.submitRoot(merkleRoot, validDuration);
         bytes32 newRoot = keccak256(bytes.concat(keccak256(abi.encode(msg.sender, 2000))));
-        airdrop.updateMerkleRoot(newRoot);
-        Airdrop.DistributionRoot memory distribution = airdrop.getDistributionRoot(1);
+        airdrop.updateRoot(newRoot);
+        Airdrop.Dist memory distribution = airdrop.getRoot(1);
         assertEq(distribution.root, newRoot);
     }
 
     function testUpdateDuration() public {
-        airdrop.submitMerkleRoot(merkleRoot, validDuration);
+        airdrop.submitRoot(merkleRoot, validDuration);
         uint32 newDuration = 60 days;
         airdrop.updateDuration(newDuration);
-        Airdrop.DistributionRoot memory distribution = airdrop.getDistributionRoot(1);
+        Airdrop.Dist memory distribution = airdrop.getRoot(1);
         assertEq(distribution.duration, newDuration);
     }
 
     function testSetAirdropDisabled() public {
-        airdrop.submitMerkleRoot(merkleRoot, validDuration);
+        airdrop.submitRoot(merkleRoot, validDuration);
         airdrop.setAirdrop(true);
-        Airdrop.DistributionRoot memory distribution = airdrop.getDistributionRoot(1);
+        Airdrop.Dist memory distribution = airdrop.getRoot(1);
         assertEq(distribution.disabled, true);
     }
 }

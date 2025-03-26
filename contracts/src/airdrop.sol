@@ -15,7 +15,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
-    struct DistributionRoot {
+    struct Dist {
         /// @notice The root of Merkle tree for airdrop distribution.
         bytes32 root;
         /// @notice The timestamp when this distribution becomes active.
@@ -27,9 +27,9 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
     }
 
     /// @notice Mapping of epoch to its distribution root data.
-    mapping(uint256 => DistributionRoot) private merkleRoots;
+    mapping(uint256 => Dist) private merkleRoots;
     /// @notice Mapping of epoch and user address to claim status.
-    mapping(uint256 => mapping(address => bool)) private hasClaimed;
+    mapping(uint256 => mapping(address => bool)) private claimed;
     /// @notice Delay in timestamp (seconds) before a posted root can be claimed against.
     uint32 public activationDelay;
     /// @notice Current epoch number of the airdrop distribution.
@@ -83,7 +83,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
 
         votingEscrow = _votingEscrow;
         brToken = _brToken;
-        _setActivationDelay(_activationDelay);
+        _setDelay(_activationDelay);
         currentEpoch = 0;
     }
 
@@ -108,8 +108,8 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @dev Only callable by accounts with OPERATOR_ROLE.
      * @param _activationDelay The new value for activationDelay.
      */
-    function setActivationDelay(uint32 _activationDelay) external onlyRole(OPERATOR_ROLE) {
-        _setActivationDelay(_activationDelay);
+    function setDelay(uint32 _activationDelay) external onlyRole(OPERATOR_ROLE) {
+        _setDelay(_activationDelay);
     }
 
     /**
@@ -118,13 +118,13 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @param _newRoot The Merkle root of the new distribution.
      * @param _duration The duration in seconds for which this distribution is valid.
      */
-    function submitMerkleRoot(bytes32 _newRoot, uint32 _duration) external onlyRole(OPERATOR_ROLE) {
+    function submitRoot(bytes32 _newRoot, uint32 _duration) external onlyRole(OPERATOR_ROLE) {
         require(_duration > 0, "SYS002");
         require(_newRoot != bytes32(0), "SYS002");
         require(!_isActive(), "USR001");
         currentEpoch++;
 
-        merkleRoots[currentEpoch] = DistributionRoot({
+        merkleRoots[currentEpoch] = Dist({
             root: _newRoot,
             activatedAt: uint32(block.timestamp) + activationDelay,
             duration: _duration,
@@ -139,7 +139,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @dev Only callable by accounts with OPERATOR_ROLE.
      * @param _newRoot The new Merkle root to replace the current one.
      */
-    function updateMerkleRoot(bytes32 _newRoot) external onlyRole(OPERATOR_ROLE) {
+    function updateRoot(bytes32 _newRoot) external onlyRole(OPERATOR_ROLE) {
         require(currentEpoch > 0, "USR002");
         require(_newRoot != bytes32(0), "USR003");
         emit MerkleRootUpdate(currentEpoch, merkleRoots[currentEpoch].root, _newRoot);
@@ -165,7 +165,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      */
     function setAirdrop(bool _disabled) external onlyRole(OPERATOR_ROLE) {
         require(currentEpoch > 0, "USR002");
-        DistributionRoot storage distribution = merkleRoots[currentEpoch];
+        Dist storage distribution = merkleRoots[currentEpoch];
         emit DistributionDisabledSet(currentEpoch, distribution.disabled, _disabled);
         distribution.disabled = _disabled;
     }
@@ -182,7 +182,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @dev Internal function to update the delay before claims can be made.
      * @param _activationDelay The new activation delay value in seconds.
      */
-    function _setActivationDelay(uint32 _activationDelay) internal {
+    function _setDelay(uint32 _activationDelay) internal {
         emit ActivationDelaySet(activationDelay, _activationDelay);
         activationDelay = _activationDelay;
     }
@@ -195,7 +195,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
     function _isActive() internal view returns (bool) {
         if (currentEpoch == 0) return false;
 
-        DistributionRoot memory distribution = merkleRoots[currentEpoch];
+        Dist memory distribution = merkleRoots[currentEpoch];
         if (distribution.disabled) return false;
 
         uint256 currentTime = block.timestamp;
@@ -220,9 +220,9 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      */
     function claim(uint256 _amount, bytes32[] calldata _proof) external whenNotPaused nonReentrant {
         require(currentEpoch > 0, "USR002");
-        require(!hasClaimed[currentEpoch][msg.sender], "USR005");
+        require(!claimed[currentEpoch][msg.sender], "USR005");
 
-        DistributionRoot memory distribution = merkleRoots[currentEpoch];
+        Dist memory distribution = merkleRoots[currentEpoch];
         require(!distribution.disabled, "USR006");
 
         // Check if the distribution is within valid period.
@@ -234,7 +234,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
         require(MerkleProofUpgradeable.verify(_proof, distribution.root, leaf), "USR009");
 
         // Mark as claimed.
-        hasClaimed[currentEpoch][msg.sender] = true;
+        claimed[currentEpoch][msg.sender] = true;
 
         // Transfer tokens and lock in VotingEscrow.
         IERC20(brToken).safeApprove(votingEscrow, _amount);
@@ -245,11 +245,11 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
 
     /**
      * @notice Retrieves the distribution root information for a specific epoch.
-     * @dev Returns the complete DistributionRoot struct.
+     * @dev Returns the complete Dist struct.
      * @param _epoch The epoch number to query.
-     * @return The DistributionRoot struct containing root, activatedAt, validDuration and disabled status.
+     * @return The Dist struct containing root, activatedAt, duration and disabled status.
      */
-    function getDistributionRoot(uint256 _epoch) external view returns (DistributionRoot memory) {
+    function getRoot(uint256 _epoch) external view returns (Dist memory) {
         return merkleRoots[_epoch];
     }
 
@@ -260,11 +260,11 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @param _users An array of user addresses to check.
      * @return An array of boolean values indicating claim status for each user.
      */
-    function hasUsersClaimed(uint256 _epoch, address[] calldata _users) external view returns (bool[] memory) {
+    function hasClaimed(uint256 _epoch, address[] calldata _users) external view returns (bool[] memory) {
         require(_users.length > 0, "SYS002");
         bool[] memory claims = new bool[](_users.length);
         for (uint256 i = 0; i < _users.length; i++) {
-            claims[i] = hasClaimed[_epoch][_users[i]];
+            claims[i] = claimed[_epoch][_users[i]];
         }
         return claims;
     }
@@ -274,7 +274,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @dev Returns false if: no active epoch, distribution disabled, not activated yet, or expired.
      * @return True if the current epoch's airdrop is valid and active.
      */
-    function isCurrentEpochActive() external view returns (bool) {
+    function isActive() external view returns (bool) {
         return _isActive();
     }
 
