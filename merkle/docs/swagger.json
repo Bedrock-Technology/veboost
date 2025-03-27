@@ -9,52 +9,6 @@
     "host": "localhost:8080",
     "basePath": "/api/v1",
     "paths": {
-        "/merkle/import": {
-            "post": {
-                "description": "Import address and amount data from a CSV file to update the Merkle tree",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "merkle"
-                ],
-                "summary": "Import Merkle tree data from CSV",
-                "parameters": [
-                    {
-                        "description": "Full path to the CSV file containing address and amount",
-                        "name": "csvFile",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Returns success message",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Returns error message when CSV file is invalid",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/merkle/proof": {
             "post": {
                 "description": "Get Merkle proof, amount and root hash for a given address",

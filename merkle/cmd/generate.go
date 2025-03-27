@@ -16,12 +16,6 @@ import (
 )
 
 var (
-	// Parameters for export-csv command
-	startTime uint64
-	endTime   uint64
-	chainID   string
-	outFile   string
-
 	// Parameters for normalize-csv command
 	inputFile     string
 	outputFile    string
@@ -31,7 +25,72 @@ var (
 	// Parameters for import-merkle-csv command
 	rpcEndpoint string
 	merkleFile  string
+	epoch       uint64
+	persist     bool
+
+	// Parameters for export-csv command
+	exportEpoch   uint64
+	exportClaimed int64
+
+	// Parameters for import-airdrop command
+	importEpoch   uint64
+	importCsvFile string
+
+	// Parameters for update-claim command
+	updateClaimEpoch uint64
+
+	// Parameters for delete command
+	deleteEpoch uint64
 )
+
+// importAirdropCmd represents the import-airdrop subcommand
+var importAirdropCmd = &cobra.Command{
+	Use:   "import-airdrop",
+	Short: "Import airdrop data from CSV file",
+	Long: `Import airdrop data from a CSV file for a specific epoch.
+	    The CSV file should contain address and amount columns.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Prepare request body
+		requestBody := map[string]interface{}{
+			"epoch":   importEpoch,
+			"csvFile": importCsvFile,
+		}
+
+		jsonData, err := json.Marshal(requestBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %v", err)
+		}
+
+		// Create HTTP request
+		url := fmt.Sprintf("%s/api/v1/merkle/import_airdrop", rpcEndpoint)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		// Send request
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// Read response
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response: %v", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("API request failed: %s", string(body))
+		}
+
+		fmt.Printf("Successfully imported airdrop data from %s\n", importCsvFile)
+		return nil
+	},
+}
 
 // generateCmd represents the parent command
 var generateCmd = &cobra.Command{
@@ -163,8 +222,10 @@ var importMerkleCSVCmd = &cobra.Command{
 		importURL := fmt.Sprintf("%s/api/v1/merkle/import", strings.TrimSuffix(rpcEndpoint, "/"))
 
 		// Prepare request body
-		reqBody := map[string]string{
+		reqBody := map[string]interface{}{
 			"csvFile": merkleFile,
+			"epoch":   epoch,
+			"persist": persist,
 		}
 		jsonBody, err := json.Marshal(reqBody)
 		if err != nil {
@@ -202,6 +263,152 @@ var importMerkleCSVCmd = &cobra.Command{
 	},
 }
 
+// exportCSVCmd represents the export-csv subcommand
+var exportCSVCmd = &cobra.Command{
+	Use:   "export-csv",
+	Short: "Export airdrop data to CSV file",
+	Long: `Export airdrop data for a specific epoch to a CSV file.
+	Supports exporting all data, claimed data, or unclaimed data based on the claimed parameter.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Prepare request body
+		requestBody := map[string]interface{}{
+			"epoch":   exportEpoch,
+			"csvFile": outputFile,
+			"claimed": exportClaimed,
+		}
+
+		jsonData, err := json.Marshal(requestBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %v", err)
+		}
+
+		// Create HTTP request
+		url := fmt.Sprintf("%s/api/v1/merkle/export_airdrop", rpcEndpoint)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		// Send request
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// Read response
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response: %v", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("API request failed: %s", string(body))
+		}
+
+		fmt.Printf("Successfully exported airdrop data to %s\n", outputFile)
+		return nil
+	},
+}
+
+// updateClaimCmd represents the update-claim subcommand
+var updateClaimCmd = &cobra.Command{
+	Use:   "update-claim",
+	Short: "Update claim status for airdrop data",
+	Long: `Update claim status for airdrop data of a specific epoch by calling the API endpoint.
+    This will sync the on-chain claim status with the database.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Prepare request body
+		requestBody := map[string]interface{}{
+			"epoch": updateClaimEpoch,
+		}
+
+		jsonData, err := json.Marshal(requestBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %v", err)
+		}
+
+		// Create HTTP request
+		url := fmt.Sprintf("%s/api/v1/merkle/claimed", rpcEndpoint)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		// Send request
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// Read response
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response: %v", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("API request failed: %s", string(body))
+		}
+
+		fmt.Printf("Successfully updated claim status for epoch %d\n", updateClaimEpoch)
+		return nil
+	},
+}
+
+// deleteCmd represents the delete subcommand
+var deleteCmd = &cobra.Command{
+	Use:   "delete",
+	Short: "Delete airdrop data for specific epoch",
+	Long: `Delete all airdrop data for a specific epoch from the database.
+    This operation cannot be undone.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Prepare request body
+		requestBody := map[string]interface{}{
+			"epoch": deleteEpoch,
+		}
+
+		jsonData, err := json.Marshal(requestBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %v", err)
+		}
+
+		// Create HTTP request
+		url := fmt.Sprintf("%s/api/v1/merkle/delete_airdrop", rpcEndpoint)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		// Send request
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// Read response
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response: %v", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("API request failed: %s", string(body))
+		}
+
+		fmt.Printf("Successfully deleted airdrop data for epoch %d\n", deleteEpoch)
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(generateCmd)
 	generateCmd.AddCommand(normalizeCSVCmd)
@@ -221,8 +428,52 @@ func init() {
 	// Add flags for import-merkle-csv command
 	importMerkleCSVCmd.Flags().StringVar(&rpcEndpoint, "rpc", "http://localhost:8080", "RPC endpoint URL")
 	importMerkleCSVCmd.Flags().StringVar(&merkleFile, "file", "", "CSV file path")
+	importMerkleCSVCmd.Flags().Uint64Var(&epoch, "epoch", 0, "Airdrop epoch number")
+	importMerkleCSVCmd.Flags().BoolVar(&persist, "persist", false, "Persist data to database")
 
 	importMerkleCSVCmd.MarkFlagRequired("file")
+	importMerkleCSVCmd.MarkFlagRequired("epoch")
+	importMerkleCSVCmd.MarkFlagRequired("persist")
+
+	// Add export-csv command
+	generateCmd.AddCommand(exportCSVCmd)
+
+	// Add flags for export-csv command
+	exportCSVCmd.Flags().StringVar(&rpcEndpoint, "rpc", "http://localhost:8080", "RPC endpoint URL")
+	exportCSVCmd.Flags().StringVar(&outputFile, "out", "export.csv", "Output CSV file path")
+	exportCSVCmd.Flags().Uint64Var(&exportEpoch, "epoch", 0, "Airdrop epoch number")
+	exportCSVCmd.Flags().Int64Var(&exportClaimed, "claimed", 0, "Export type (0: all, 1: claimed, 2: unclaimed)")
+
+	exportCSVCmd.MarkFlagRequired("epoch")
+
+	// Add import-airdrop command
+	generateCmd.AddCommand(importAirdropCmd)
+
+	// Add flags for import-airdrop command
+	importAirdropCmd.Flags().StringVar(&rpcEndpoint, "rpc", "http://localhost:8080", "RPC endpoint URL")
+	importAirdropCmd.Flags().StringVar(&importCsvFile, "file", "", "CSV file path")
+	importAirdropCmd.Flags().Uint64Var(&importEpoch, "epoch", 0, "Airdrop epoch number")
+
+	importAirdropCmd.MarkFlagRequired("file")
+	importAirdropCmd.MarkFlagRequired("epoch")
+
+	// Add update-claim command
+	generateCmd.AddCommand(updateClaimCmd)
+
+	// Add flags for update-claim command
+	updateClaimCmd.Flags().StringVar(&rpcEndpoint, "rpc", "http://localhost:8080", "RPC endpoint URL")
+	updateClaimCmd.Flags().Uint64Var(&updateClaimEpoch, "epoch", 0, "Airdrop epoch number")
+
+	updateClaimCmd.MarkFlagRequired("epoch")
+
+	// Add delete command
+	generateCmd.AddCommand(deleteCmd)
+
+	// Add flags for delete command
+	deleteCmd.Flags().StringVar(&rpcEndpoint, "rpc", "http://localhost:8080", "RPC endpoint URL")
+	deleteCmd.Flags().Uint64Var(&deleteEpoch, "epoch", 0, "Airdrop epoch number")
+
+	deleteCmd.MarkFlagRequired("epoch")
 }
 
 // Helper function: Validate Ethereum address format with EIP-55 checksum

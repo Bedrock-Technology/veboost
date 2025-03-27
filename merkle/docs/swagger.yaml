@@ -6,37 +6,6 @@ info:
   title: Airdrop Merkle API
   version: "1.0"
 paths:
-  /merkle/import:
-    post:
-      consumes:
-      - application/json
-      description: Import address and amount data from a CSV file to update the Merkle
-        tree
-      parameters:
-      - description: Full path to the CSV file containing address and amount
-        in: body
-        name: csvFile
-        required: true
-        schema:
-          type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Returns success message
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Returns error message when CSV file is invalid
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Import Merkle tree data from CSV
-      tags:
-      - merkle
   /merkle/proof:
     post:
       consumes:

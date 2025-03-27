@@ -29,4 +29,14 @@ doc_auth:
 dns:
   # DNS server address
   endpoint: "http://localhost:8090"
-  
+
+#data base config
+db_servers:
+  ve_dsn_psql: "host=127.0.0.1 port=5432 user=root password=123456 dbname=ethereum sslmode=disable"
+  ve_dsn_mysql: ""
+
+#contracts config
+contracts:
+  airdrop:
+    rpc: "https://eth-sepolia.public.blastapi.io"
+    address: "0xcFB4AefB7B655d26420Ab9f208172F5e289F2D35"
