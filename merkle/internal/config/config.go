@@ -3,15 +3,31 @@ package config
 import (
 	"fmt"
 	"github.com/spf13/viper"
+	"sync"
+)
+
+var (
+	instance *AppConfig
+	once     sync.Once
 )
 
 // AppConfig represents the entire application configuration
 type AppConfig struct {
-	Logger   LogConfig         `mapstructure:"logger"`
-	DocAuth  map[string]string `mapstructure:"doc_auth"`
-	DNS      struct {
-		Endpoint string `mapstructure:"endpoint"`
-	} `mapstructure:"dns"`
+    Logger    LogConfig         `mapstructure:"logger"`
+    DocAuth   map[string]string `mapstructure:"doc_auth"`
+    DNS       struct {
+        Endpoint string `mapstructure:"endpoint"`
+    } `mapstructure:"dns"`
+    DBServers struct {
+        VeDsnPsql  string `mapstructure:"ve_dsn_psql"`
+        VeDsnMysql string `mapstructure:"ve_dsn_mysql"`
+    } `mapstructure:"db_servers"`
+    Contracts struct {
+        Airdrop struct {
+            RPC     string `mapstructure:"rpc"`
+            Address string `mapstructure:"address"`
+        } `mapstructure:"airdrop"`
+    } `mapstructure:"contracts"`
 }
 
 // LogConfig represents logger configuration
@@ -28,17 +44,29 @@ type LogConfig struct {
 	} `mapstructure:"file"`
 }
 
-// LoadConfig loads the application configuration from file
-func LoadConfig(configPath string) (*AppConfig, error) {
-	viper.SetConfigFile(configPath)
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config file: %v", err)
-	}
+// InitConfig initializes the configuration singleton
+func InitConfig(configPath string) error {
+	var err error
+	once.Do(func() {
+		instance = &AppConfig{}
+		viper.SetConfigFile(configPath)
+		if err = viper.ReadInConfig(); err != nil {
+			err = fmt.Errorf("failed to read config file: %v", err)
+			return
+		}
 
-	var appConfig AppConfig
-	if err := viper.Unmarshal(&appConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
-	}
+		if err = viper.Unmarshal(instance); err != nil {
+			err = fmt.Errorf("failed to unmarshal config: %v", err)
+			return
+		}
+	})
+	return err
+}
 
-	return &appConfig, nil
+// GetConfig returns the configuration singleton instance
+func GetConfig() *AppConfig {
+	if instance == nil {
+		panic("configuration not initialized")
+	}
+	return instance
 }
