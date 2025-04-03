@@ -59,7 +59,7 @@ contract MerkleTreeTest is Test {
 
         // Prepare initialization data
         bytes memory initData = abi.encodeWithSelector(
-            Airdrop.initialize.selector, ACTIVATION_DELAY, address(votingEscrow), address(brToken), admin
+            Airdrop.initialize.selector, ACTIVATION_DELAY, address(votingEscrow), admin
         );
 
         // Deploy proxy contract

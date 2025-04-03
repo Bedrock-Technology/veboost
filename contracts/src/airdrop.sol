@@ -62,15 +62,13 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
      * @dev Sets up roles and initializes core contract parameters.
      * @param _activationDelay The initial delay before claims can be made.
      * @param _votingEscrow The address of the voting escrow contract.
-     * @param _brToken The address of the BR token contract.
      * @param _admin The address of the contract administrator.
      */
-    function initialize(uint32 _activationDelay, address _votingEscrow, address _brToken, address _admin)
+    function initialize(uint32 _activationDelay, address _votingEscrow, address _admin)
         public
         initializer
     {
         require(_votingEscrow != address(0), "SYS001");
-        require(_brToken != address(0), "SYS001");
         require(_admin != address(0), "SYS001");
 
         __AccessControl_init();
@@ -82,7 +80,8 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
         _setupRole(OPERATOR_ROLE, _admin);
 
         votingEscrow = _votingEscrow;
-        brToken = _brToken;
+        brToken = IVotingEscrowCore(votingEscrow).token();
+        require(brToken != address(0), "SYS001");
         _setDelay(_activationDelay);
         currentEpoch = 0;
     }
@@ -131,7 +130,7 @@ contract Airdrop is Initializable, AccessControlUpgradeable, PausableUpgradeable
             disabled: false
         });
 
-        emit MerkleRootSubmit(currentEpoch, _newRoot, _duration, uint32(block.timestamp));
+        emit MerkleRootSubmit(currentEpoch, _newRoot, _duration, uint32(block.timestamp) + activationDelay);
     }
 
     /**

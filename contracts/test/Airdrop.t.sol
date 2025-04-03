@@ -41,7 +41,7 @@ contract AirdropTest is Test {
 
         // Prepare initialization data
         bytes memory initData = abi.encodeWithSelector(
-            Airdrop.initialize.selector, activationDelay, address(votingEscrow), address(brToken), admin
+            Airdrop.initialize.selector, activationDelay, address(votingEscrow), admin
         );
 
         // Deploy proxy contract

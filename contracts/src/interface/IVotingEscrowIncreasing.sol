@@ -8,4 +8,7 @@ interface IVotingEscrowCore
     /// @param _to Address to deposit
     /// @return TokenId of created veNFT
     function createLockFor(uint256 _value, address _to) external returns (uint256);
+
+    /// @notice Address of the underying ERC20 token.
+    function token() external view returns (address);
 }
