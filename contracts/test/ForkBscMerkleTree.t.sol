@@ -57,7 +57,7 @@ contract ForkBscMerkleTreeTest is Test {
 
         // Prepare initialization data
         bytes memory initData =
-            abi.encodeWithSelector(Airdrop.initialize.selector, ACTIVATION_DELAY, VOTING_ESCROW, BR_TOKEN, admin);
+            abi.encodeWithSelector(Airdrop.initialize.selector, ACTIVATION_DELAY, VOTING_ESCROW, admin);
 
         // Deploy proxy contract
         TransparentUpgradeableProxy proxy =
