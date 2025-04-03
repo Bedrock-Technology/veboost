@@ -14,7 +14,6 @@ DEPLOYER=<deployer-account-name>
 DEPLOYER_ADDRESS=<deployer-address>
 MERKLE_ROOT=<merkle-root-hex>
 VOTING_ESCROW_ADDRESS=<voting-escrow-contract-address>
-BR_TOKEN_ADDRESS=<br-token-contract-address>
 PROXY_ADMIN=<proxy-admin-address>
 ADMIN=<admin-address>
 ACTIVATION_DELAY=<activation-delay-seconds>
@@ -50,7 +49,6 @@ contract DeployAirdrop is Script {
         address deployer = vm.envAddress("DEPLOYER_ADDRESS");
         address proxyAdmin = vm.envAddress("PROXY_ADMIN");
         address votingEscrow = vm.envAddress("VOTING_ESCROW_ADDRESS");
-        address brToken = vm.envAddress("BR_TOKEN_ADDRESS");
         address admin = vm.envAddress("ADMIN");
         uint32 activationDelay = uint32(vm.envUint("ACTIVATION_DELAY"));
 
@@ -61,7 +59,6 @@ contract DeployAirdrop is Script {
         console.log("Deployer:", deployer);
         console.log("ProxyAdmin:", proxyAdmin);
         console.log("VotingEscrow:", votingEscrow);
-        console.log("BRToken:", brToken);
         console.log("Admin:", admin);
         console.log("ActivationDelay:", activationDelay);
 
@@ -75,7 +72,6 @@ contract DeployAirdrop is Script {
             Airdrop.initialize.selector,
             activationDelay,
             votingEscrow,
-            brToken,
             admin
         );
 
