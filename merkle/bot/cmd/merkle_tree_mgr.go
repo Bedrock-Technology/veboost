@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/Bedrock-Technology/VeMerkle/internal/contracts"
@@ -28,27 +30,33 @@ func MerkleTreeManagerInit() {
 	}
 
 	if maxEpoch == 0 {
-		slog.Error("No Merkle tree found in database")
+		slog.Info("No Merkle tree found in database, initializing empty manager")
 		MerkleTreeManager = mgr
 		return
 	}
 
 	// If maxEpoch is greater than 0, it means there's a Merkle tree to load
-	slog.Info("Loading latest Merkle tree into memory")
+	slog.Info("Loading latest Merkle tree into memory", slog.Uint64("epoch", maxEpoch))
 	// Use the Get method to load the Merkle tree, which handles both
 	// database retrieval and in-memory caching.
 	if _, err := mgr.Get(maxEpoch); err != nil {
 		slog.Error("Failed to load Merkle tree for the latest epoch", slog.Uint64("epoch", maxEpoch), slog.Any("error", err))
+		panic(err)
 	}
+
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
 
 	mgr.maxEpoch = maxEpoch
 	MerkleTreeManager = mgr
+	slog.Info("[MerkleTreeManager] Initialized successfully", slog.Uint64("max_epoch", maxEpoch))
 }
 
 // MerkleTreeManager is a type alias for a map that manages MerkleTree instances by epoch.
 type merkleTreeManager struct {
 	trees    map[uint64]*MerkleTree
 	maxEpoch uint64
+	mu       sync.Mutex
 }
 
 // MerkleTree holds the standard Merkle tree, along with maps for quick address and amount lookups.
@@ -136,15 +144,33 @@ func (m *merkleTreeManager) Import(merkleTree *MerkleTree, epoch uint64) error {
 	airdropRecords := make([]*psql.AirdropData, 0, len(merkleTree.Address))
 
 	for addr := range merkleTree.Address {
+		leaf := []any{
+			merkletree.SolAddress(addr),
+			merkletree.SolNumber(merkleTree.Amount[addr].String()),
+		}
+
+		proof, err := merkleTree.Tree.GetProof(leaf)
+		if err != nil {
+			return fmt.Errorf("failed to get proof for address %s: %v", addr, err)
+		}
+
+		// Convert proof to hex strings
+		hexProof := make([]string, len(proof))
+		for i, p := range proof {
+			hexProof[i] = "0x" + hex.EncodeToString(p)
+		}
+
 		airdropRecords = append(airdropRecords, &psql.AirdropData{
 			Epoch:     epoch,
 			Address:   addr,
 			Amount:    merkleTree.Amount[addr].String(),
+			Proof:     hexProof,
 			Claimed:   false,
 			CreatedAt: time.Now().Unix(),
 		})
 	}
 
+	merkleTree.Epoch = epoch
 	// Marshal the Merkle tree
 	marshaledData, err := json.Marshal(merkleTree)
 	if err != nil {
@@ -156,7 +182,12 @@ func (m *merkleTreeManager) Import(merkleTree *MerkleTree, epoch uint64) error {
 		return fmt.Errorf("failed to save airdrop and merkle tree data: %v", err)
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.trees[epoch] = merkleTree
+	slog.Info("[MerkleTreeManager] Import", slog.Uint64("max_epoch", epoch))
+
 	m.maxEpoch = epoch
 	return nil
 }
@@ -186,6 +217,9 @@ func (m *merkleTreeManager) Update(merkleTree *MerkleTree, epoch uint64) error {
 		return fmt.Errorf("epoch does not exist in database")
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.trees[epoch] = merkleTree
 	return nil
 }
@@ -212,8 +246,13 @@ func (m *merkleTreeManager) Delete(epoch uint64) error {
 		return fmt.Errorf("failed to delete airdrop and merkle tree data from database: %v", err)
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	// Delete from memory
 	delete(m.trees, epoch)
+	slog.Info("[MerkleTreeManager] Delete", slog.Uint64("max_epoch", epoch-1))
+
 	m.maxEpoch = epoch - 1
 	return nil
 }
@@ -223,7 +262,9 @@ func (m *merkleTreeManager) Delete(epoch uint64) error {
 // database for the marshaled tree data, unmarshals it, and stores it in memory
 // for future access before returning it.
 func (m *merkleTreeManager) Get(epoch uint64) (*MerkleTree, error) {
+	m.mu.Lock()
 	tree, found := m.trees[epoch]
+	m.mu.Unlock()
 	if found {
 		return tree, nil
 	}
@@ -241,6 +282,14 @@ func (m *merkleTreeManager) Get(epoch uint64) (*MerkleTree, error) {
 
 	merkleTree.Epoch = epoch
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check again in case another goroutine loaded the tree while we were working
+	if existingTree, ok := m.trees[epoch]; ok {
+		return existingTree, nil
+	}
+
 	// Store in memory for future access
 	m.trees[epoch] = &merkleTree
 
@@ -249,8 +298,12 @@ func (m *merkleTreeManager) Get(epoch uint64) (*MerkleTree, error) {
 
 // GetLatestMerkleTree retrieves the Merkle tree for the highest epoch.
 func (m *merkleTreeManager) GetLatestMerkleTree() (*MerkleTree, error) {
-	if m.maxEpoch == 0 {
+	m.mu.Lock()
+	maxEpoch := m.maxEpoch
+	m.mu.Unlock()
+
+	if maxEpoch == 0 {
 		return nil, fmt.Errorf("no merkle tree found in manager")
 	}
-	return m.Get(m.maxEpoch)
+	return m.Get(maxEpoch)
 }
