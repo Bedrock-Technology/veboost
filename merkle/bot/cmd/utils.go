@@ -63,7 +63,7 @@ func postMessage(client *slack.Client, channel, text, timestamp string, messageT
 // a file name, title, and an initial comment. It can also post the file
 // within a specific thread by using the thread's timestamp.
 func uploadFileToSlack(ctx CommandContext, channelID, threadTs, fileName, title, comment string, fileContent *bytes.Buffer) error {
-	params := slack.UploadFileV2Parameters{
+	params := slack.UploadFileParameters{
 		Reader:   fileContent,
 		Filename: fileName,
 		FileSize: fileContent.Len(),
@@ -79,7 +79,7 @@ func uploadFileToSlack(ctx CommandContext, channelID, threadTs, fileName, title,
 		params.InitialComment = comment
 	}
 
-	_, err := ctx.Client.UploadFileV2(params)
+	_, err := ctx.Client.UploadFile(params)
 	if err != nil {
 		slog.Error("Error uploading file to Slack", "error", err, "channel", channelID)
 		return err
