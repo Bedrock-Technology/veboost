@@ -1,0 +1,25 @@
+logger:
+  level: info
+  format: json
+  stdout: true
+  file:
+    path: /app/logs/app.log
+    max_size: 100
+    max_backups: 5
+    max_age: 30
+    compress: true
+
+doc_auth:
+  ve_merkle: "CHANGE_ME"
+
+dns:
+  endpoint: "http://host.docker.internal:8090"
+
+db_servers:
+  ve_dsn_psql: "host=host.docker.internal port=5432 user=vemerkle password=CHANGE_ME dbname=vemerkle sslmode=disable"
+  ve_dsn_mysql: ""
+
+contracts:
+  airdrop:
+    rpc: "https://YOUR_RPC_ENDPOINT"
+    address: "YOUR_AIRDROP_CONTRACT_ADDRESS"

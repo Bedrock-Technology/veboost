@@ -1,0 +1,37 @@
+services:
+  vemerkle:
+    image: ${VEMERKLE_IMAGE:-ghcr.io/bedrock-technology/veboost:dev}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    command: ["run", "--port", "8080"]
+    ports:
+      - "${VEMERKLE_PORT:-8080}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - type: bind
+        source: ${VEMERKLE_CONFIG_FILE:-./merkle/configs/airdrop.docker.yaml}
+        target: /app/configs/airdrop.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${VEMERKLE_ENV_FILE:-./merkle/.env}
+        target: /app/.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - logs:/app/logs
+      - data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  logs:
+  data:
