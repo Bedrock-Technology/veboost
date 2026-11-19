@@ -1,0 +1,56 @@
+name: Build dev image
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate image tags
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          image="$(printf 'ghcr.io/%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          version="$(git describe --always --tags)"
+          version="$(printf '%s' "$version" | sed 's/[^a-zA-Z0-9_.-]/-/g' | cut -c1-80)"
+          tag="dev-${version}-$(date -u +%Y%m%d)-${GITHUB_SHA:0:12}"
+          {
+            echo "name=$image"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
+            ${{ steps.image.outputs.name }}:dev
+            ${{ steps.image.outputs.name }}:dev-last
+          cache-from: type=gha,scope=dev-vemerkle
+          cache-to: type=gha,mode=max,scope=dev-vemerkle
